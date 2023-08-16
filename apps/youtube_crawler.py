@@ -1,11 +1,12 @@
 from selenium import webdriver
-import time, json, re
+import time, json, re, logging
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
 
 JSON_PATH = "temp\youtube_data.json"
 CSV_PATH = "temp\youtube_data.csv"
-HOME_PAGE_RELATE_VIDEO_INFO_PATH = 'temp\hompage_list_video_link.json'
+HOME_PAGE_RELATE_VIDEO_INFO_PATH = "temp\hompage_list_video_link.json"
+
 
 class DetailCrawler:
     def __init__(self, driver):
@@ -27,7 +28,6 @@ class DetailCrawler:
             video_info["short_description"],
         ) = self._extract_overview_info()
 
-
         # Extract video description (ERROR)
         # description_element = self.driver.find_element("css selector", "#description-text-container yt-formatted-string")
         # description_text = description_element.get_attribute("textContent").strip()
@@ -36,8 +36,6 @@ class DetailCrawler:
         video_info["duration"] = self.driver.execute_script(
             'return document.querySelector(".ytp-time-duration").textContent;'
         )
-
-        print()
 
         video_info["subcribers"] = self.driver.find_element(
             By.ID, "owner-sub-count"
@@ -71,20 +69,22 @@ class DetailCrawler:
         return channel_link, channel_name
 
     def _extract_overview_info(self):
-        short_description = self.driver.find_element(By.ID, "description-inner").text.strip()
+        short_description = self.driver.find_element(
+            By.ID, "description-inner"
+        ).text.strip()
         views = (
-        re.search(r"([\d\.]+[KM]? views)", short_description).group(1)
-        if re.search(r"([\d\.]+[KM]? views)", short_description)
-        else "Views not found"
+            re.search(r"([\d\.]+[KM]? views)", short_description).group(1)
+            if re.search(r"([\d\.]+[KM]? views)", short_description)
+            else "Views not found"
         )
         upload_date = (
             re.search(r"(\d+ [a-z]+ ago)", short_description).group(1)
             if re.search(r"(\d+ [a-z]+ ago)", short_description)
             else "Time not found"
         )
-        short_description = re.split(r"([\d\.]+[KM]? views|\d+ [a-z]+ ago)", short_description)[
-            -1
-        ].strip()
+        short_description = re.split(
+            r"([\d\.]+[KM]? views|\d+ [a-z]+ ago)", short_description
+        )[-1].strip()
         return views, upload_date, short_description
 
     def run(
@@ -97,7 +97,7 @@ class DetailCrawler:
 
             # Scroll down to load comments
             body = self.driver.find_element("tag name", "body")
-            for _ in range(10):  
+            for _ in range(10):
                 body.send_keys(Keys.PAGE_DOWN)
                 time.sleep(1)
 
@@ -114,38 +114,46 @@ class DetailCrawler:
         except Exception as e:
             print("An error occurred:", str(e))
 
+
 class HomePageCrawler:
     def __init__(self, driver):
         self.driver = driver
-    
+
     def export_relate_video_info_to_json(self):
-        self.save_to_json(self.get_all_relate_video_info(), HOME_PAGE_RELATE_VIDEO_INFO_PATH)
-    
+        self.save_to_json(
+            self.get_all_relate_video_info(), HOME_PAGE_RELATE_VIDEO_INFO_PATH
+        )
+
     def get_all_relate_video_info(self):
         self.driver.get("https://www.youtube.com")
-        time.sleep(5)  
+        time.sleep(5)
 
         # Scroll down to load more videos
         for _ in range(2):
-            self.driver.execute_script('window.scrollTo(0, document.body.scrollHeight);')
+            self.driver.execute_script(
+                "window.scrollTo(0, document.body.scrollHeight);"
+            )
             time.sleep(3)
 
         video_info_list = []
         # Find all video thumbnail elements
-        video_thumbnails = self.driver.find_elements("css selector", 'a#video-title-link')
+        video_thumbnails = self.driver.find_elements(
+            "css selector", "a#video-title-link"
+        )
 
         # Extract link and title values from elements
         for thumbnail in video_thumbnails:
             video_info = {
-                'link': thumbnail.get_attribute('href'),
-                'title': thumbnail.get_attribute('title')
+                "link": thumbnail.get_attribute("href"),
+                "title": thumbnail.get_attribute("title"),
             }
             video_info_list.append(video_info)
         return video_info_list
-    
+
     def save_to_json(self, data, filename):
-        with open(filename, 'w') as json_file:
+        with open(filename, "w") as json_file:
             json.dump(data, json_file, indent=4)
+
 
 class YoutubeCrawlerTool:
     def __init__(self):
@@ -155,57 +163,81 @@ class YoutubeCrawlerTool:
         self.driver = webdriver.Chrome(options=options)
         self.detail_crawler = DetailCrawler(self.driver)
         self.homepage_crawler = HomePageCrawler(self.driver)
-    
+        self.setup_logging()
+
+    def setup_logging(self):
+        self.logger = logging.getLogger("my_logger")
+        self.logger.setLevel(logging.INFO)
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        formatter = logging.Formatter("%(asctime)s - %(message)s")
+        console_handler.setFormatter(formatter)
+        self.logger.addHandler(console_handler)
+
     def run_script1(self):
         """
-        Lấy lượng lớn video link ở homepage  => Crawl dữ liệu của từng Video 
+        Lấy lượng lớn video link ở homepage  => Crawl dữ liệu của từng Video
         """
-        #Homepage Process 
+        # Homepage Process
         list_video_info = self.homepage_crawler.get_all_relate_video_info()
-        self.homepage_crawler.save_to_json(list_video_info, HOME_PAGE_RELATE_VIDEO_INFO_PATH)
+        self.homepage_crawler.save_to_json(
+            list_video_info, HOME_PAGE_RELATE_VIDEO_INFO_PATH
+        )
 
-        #Video detail Process
+        # Video detail Process
         detail_list = []
         for video_info in list_video_info[1:4]:
-            detail_list.append(self.detail_crawler.run(video_info['link']))
-        
+            detail_list.append(self.detail_crawler.run(video_info["link"]))
+
         self._export_to_json(detail_list)
         self.driver.quit()
 
     def run_script2(self, keyword_list=[]):
         """
-        Tìm theo keyword => Lấy lượng lớn Video link ở màn đó 
-        => Crawl dữ liệu của từng Video 
+        Tìm theo keyword => Lấy lượng lớn Video link ở màn đó
+        => Crawl dữ liệu của từng Video
         """
 
         detail_list = []
         for keyword in keyword_list:
             search_url = f"https://www.youtube.com/results?search_query={keyword}"
             self.driver.get(search_url)
-            self.driver.implicitly_wait(10)
-            video_thumbnails = self.driver.find_elements(By.CSS_SELECTOR, 'a#video-title')
-            video_links = [thumbnail.get_attribute('href') for thumbnail in video_thumbnails]
-            
+            self.driver.implicitly_wait(5)
+            video_thumbnails = self.driver.find_elements(
+                By.CSS_SELECTOR, "a#video-title"
+            )
+            video_links = [
+                thumbnail.get_attribute("href") for thumbnail in video_thumbnails
+            ]
+
             try:
                 detail_list.append(self.script2_scrape_video(video_links, keyword))
             except Exception:
                 continue
-        
+
         self._export_to_json(detail_list)
         self.driver.quit()
 
     def script2_scrape_video(self, video_links, keyword):
-        data_by_keyword_dict = {keyword:[]}
-        for video_link in video_links:
+        data_by_keyword_dict = {keyword: []}
+        for index, video_link in enumerate(video_links):
+            self.logger.info(
+                f"Processing keyword: {keyword} ({index + 1}/{len(video_links)})"
+            )
             data_by_keyword_dict[keyword].append(self.detail_crawler.run(video_link))
         return data_by_keyword_dict
-    
+
     def _export_to_json(self, detail_list):
         detail_json_string = json.dumps(detail_list, indent=4)
         with open(JSON_PATH, "w", encoding="utf-8") as json_file:
             json_file.write(detail_json_string)
 
+
 if __name__ == "__main__":
+    start_time = time.time()
     tool = YoutubeCrawlerTool()
     # tool.run_script1()
-    tool.run_script2(['LOL', "Hieu Thu Hai"])
+    tool.run_script2(["LOL", "Hieu Thu Hai"])
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    tool.logger.info(f"Script execution time: {elapsed_time:.2f} seconds")
