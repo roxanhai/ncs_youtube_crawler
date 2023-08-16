@@ -1,11 +1,11 @@
 from selenium import webdriver
-import time, json, re, csv
+import time, json, re
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
 
-JSON_PATH = "youtube_data.json"
-CSV_PATH = "youtube_data.csv"
-HOME_PAGE_RELATE_VIDEO_INFO_PATH = 'hompage_list_video_link.json'
+JSON_PATH = "temp\youtube_data.json"
+CSV_PATH = "temp\youtube_data.csv"
+HOME_PAGE_RELATE_VIDEO_INFO_PATH = 'temp\hompage_list_video_link.json'
 
 class DetailCrawler:
     def __init__(self, driver):
