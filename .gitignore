@@ -1,1 +1,4 @@
 venv
+.vscode
+apps/test.py
+apps/__pycache__
