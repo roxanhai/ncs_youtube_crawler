@@ -2,3 +2,5 @@ venv
 .vscode
 apps/test.py
 apps/__pycache__
+temp
+logs
